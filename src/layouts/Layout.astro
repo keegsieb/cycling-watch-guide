@@ -1,0 +1,39 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = 'Find out how much of a cycling race is worth watching — without spoilers.' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}favicon.svg`} />
+    <title>{title} — CyclingWorthWatching</title>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href={`${import.meta.env.BASE_URL}`} class="site-title">
+          🚴 CyclingWorthWatching
+        </a>
+        <span class="tagline">No spoilers. Just good racing.</span>
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer>
+      <p>
+        Race data sourced from <a href="https://www.procyclingstats.com" target="_blank" rel="noopener">ProCyclingStats</a>.
+        This is a fan project. Not affiliated with PCS.
+      </p>
+    </footer>
+  </body>
+</html>

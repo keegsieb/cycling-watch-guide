@@ -1,0 +1,81 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Rebuild and deploy every day at 07:00 UTC to pick up new races
+  schedule:
+    - cron: '0 7 * * *'
+  # Also deploy on every push to the main branch
+  push:
+    branches:
+      - main
+  # Allow manual deploys from the Actions tab
+  workflow_dispatch:
+
+# Required for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only allow one deployment at a time
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python step: fetch race data from ProCyclingStats ─────────────────
+      # Uses the `procyclingstats` Python library (github.com/themm1/procyclingstats)
+      # to scrape race data and write src/data/races-live.json.
+      # The Astro build reads this file in preference to the built-in seed data.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install procyclingstats
+
+      - name: Fetch recent races from ProCyclingStats
+        run: python3 scripts/fetch-races.py
+        # Non-fatal: if scraping fails (e.g. Cloudflare), the Astro build
+        # falls back to the seed data automatically.
+        continue-on-error: true
+
+      # ── Node.js step: build the Astro site ───────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: './package-lock.json'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Astro site
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

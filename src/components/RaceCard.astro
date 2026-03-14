@@ -1,0 +1,41 @@
+---
+import type { Race } from '../lib/procyclingstats';
+
+interface Props {
+  race: Race;
+}
+const { race } = Astro.props;
+
+const base = import.meta.env.BASE_URL;
+const racePageUrl = `${base}race/${encodeURIComponent(race.slug)}`;
+
+function formatDate(d: string) {
+  if (!d) return '';
+  const date = new Date(d + 'T12:00:00Z');
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const isStageRace = race.startDate !== race.endDate;
+const stageCount = race.stages.length;
+---
+
+<a href={racePageUrl} class="race-card">
+  <div class="race-card-flag">
+    {race.country && <span class={`flag flag-${race.country.toLowerCase()}`}></span>}
+  </div>
+  <div class="race-card-body">
+    <h2 class="race-card-name">{race.name}</h2>
+    <div class="race-card-meta">
+      {isStageRace ? (
+        <span>{formatDate(race.startDate)} – {formatDate(race.endDate)}</span>
+      ) : (
+        <span>{formatDate(race.endDate)}</span>
+      )}
+      {race.category && <span class="race-card-cat">{race.category}</span>}
+      {isStageRace && stageCount > 0 && (
+        <span class="race-card-stages">{stageCount} stage{stageCount !== 1 ? 's' : ''}</span>
+      )}
+    </div>
+  </div>
+  <div class="race-card-arrow">→</div>
+</a>
