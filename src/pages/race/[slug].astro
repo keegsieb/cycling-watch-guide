@@ -1,7 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import RaceProfile from '../../components/RaceProfile.astro';
-import { getFullRace } from '../../lib/procyclingstats';
 import { getAllRaces } from '../../lib/getRaces';
 import type { Race } from '../../lib/procyclingstats';
 
@@ -15,13 +14,8 @@ export async function getStaticPaths() {
 
 const { race: raceBase } = Astro.props as { race: Race };
 
-// Fetch full race details (stages + profile images) at build time
+// Stages and profile images are already enriched by getAllRaces() via cyclingoo.
 let race: Race = raceBase;
-try {
-  race = await getFullRace(raceBase);
-} catch (err) {
-  console.error(`Failed to fetch full race for ${raceBase.slug}:`, err);
-}
 
 // If no stages were loaded (PCS blocked), build a placeholder entry
 // so the race page still has something to render.

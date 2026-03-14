@@ -7,11 +7,15 @@
  *   2. ProCyclingStats HTML scraping (Node.js build-time; blocked locally
  *      by Cloudflare but may work from GitHub Actions IPs)
  *   3. `src/data/seedRaces.ts`     — static fallback for local development
+ *
+ * After loading races from any source, stage profile images are enriched
+ * via cyclingoo.com (not Cloudflare-protected, accessible at build time).
  */
 
 import type { Race } from './procyclingstats';
 import { getRecentRaces } from './procyclingstats';
 import { SEED_RACES } from '../data/seedRaces';
+import { enrichRacesWithCyclingoo } from './cyclingoo';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
@@ -36,22 +40,37 @@ function loadLiveJson(): Race[] {
 }
 
 export async function getAllRaces(): Promise<{ races: Race[]; source: string }> {
+  let races: Race[];
+  let source: string;
+
   // 1. Python-generated JSON (preferred)
   const live = loadLiveJson();
   if (live.length > 0) {
-    return { races: live, source: 'live-json' };
-  }
-
-  // 2. Build-time PCS scrape
-  try {
-    const scraped = await getRecentRaces(7);
-    if (scraped.length > 0) {
-      return { races: scraped, source: 'pcs-scrape' };
+    races = live;
+    source = 'live-json';
+  } else {
+    // 2. Build-time PCS scrape
+    try {
+      const scraped = await getRecentRaces(7);
+      if (scraped.length > 0) {
+        races = scraped;
+        source = 'pcs-scrape';
+      } else {
+        throw new Error('empty');
+      }
+    } catch {
+      // 3. Seed data
+      races = SEED_RACES;
+      source = 'seed';
     }
-  } catch {
-    // fall through
   }
 
-  // 3. Seed data
-  return { races: SEED_RACES, source: 'seed' };
+  // Enrich all races with profile images from cyclingoo
+  try {
+    races = await enrichRacesWithCyclingoo(races);
+  } catch (err) {
+    console.error('[getRaces] cyclingoo enrichment failed:', err);
+  }
+
+  return { races, source };
 }
