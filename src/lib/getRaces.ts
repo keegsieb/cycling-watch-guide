@@ -139,7 +139,7 @@ async function enrichRacesWithSupabase(races: Race[]): Promise<Race[]> {
       if (!p) return stage;
       return {
         ...stage,
-        profileImageUrl: stage.profileImageUrl ?? p.profile_image_url,
+        profileImageUrl: p.profile_image_url ?? stage.profileImageUrl,
         distanceKm: stage.distanceKm ?? (p.distance_km != null ? Number(p.distance_km) : null),
       };
     }),
