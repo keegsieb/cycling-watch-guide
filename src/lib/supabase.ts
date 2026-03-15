@@ -55,6 +55,76 @@ export interface Rating {
   created_at: string;
 }
 
+export interface StageProfile {
+  race_slug: string;
+  race_year: number;
+  race_name: string | null;
+  race_edition: string | null;
+  race_start_date: string | null;
+  race_end_date: string | null;
+  race_classification: string | null;
+  race_uci_tour: string | null;
+  race_category: string | null;
+  stage_number: number | null;
+  stage_label: string | null;
+  stage_full_label: string | null;
+  stage_date: string | null;
+  stage_pcs_url: string | null;
+  distance_km: number | null;
+  departure: string | null;
+  arrival: string | null;
+  parcours_type: string | null;
+  profile_score: number | null;
+  vertical_meters: number | null;
+  gradient_final_km: number | null;
+  start_time: string | null;
+  profile_image_url: string | null;
+  scraped_at: string;
+}
+
+// ─── Stage profiles ──────────────────────────────────────────────────────────
+
+/**
+ * Returns all scraped stage profiles for a given year.
+ * Used at build time to enrich race/stage objects with PCS profile images
+ * before falling back to cyclingoo.
+ */
+export async function getStageProfilesByYear(year: number): Promise<StageProfile[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('stage_profiles')
+    .select('*')
+    .eq('race_year', year);
+  if (error) {
+    console.error('getStageProfilesByYear error:', error.message);
+    return [];
+  }
+  return (data ?? []) as StageProfile[];
+}
+
+/**
+ * Returns upcoming stage profiles (stage_date strictly after afterDate ISO string).
+ * Results are ordered nearest-first, then by race slug for ties.
+ */
+export async function getUpcomingStageProfiles(
+  year: number,
+  afterDate: string
+): Promise<StageProfile[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('stage_profiles')
+    .select('*')
+    .eq('race_year', year)
+    .gt('stage_date', afterDate)
+    .order('stage_date', { ascending: true })
+    .order('race_slug', { ascending: true });
+  if (error) {
+    console.error('getUpcomingStageProfiles error:', error.message);
+    return [];
+  }
+  return (data ?? []) as StageProfile[];
+}
+
 // ─── Race fetching ───────────────────────────────────────────────────────────
 
 /**

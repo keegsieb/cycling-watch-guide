@@ -740,6 +740,73 @@ a.stage-card:hover .stage-card-profile {
 .stage-nav-prev { margin-right: auto; }
 .stage-nav-next { margin-left: auto; }
 
+/* ── Show future races button ────────────────────────────────────────────── */
+
+.show-future-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 0 1rem;
+}
+
+.show-future-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .65rem 1.5rem;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+
+.show-future-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.show-future-count {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-radius: 20px;
+  padding: .1rem .55rem;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+/* ── Upcoming races section ──────────────────────────────────────────────── */
+
+.future-heading {
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  margin-bottom: 1.25rem;
+}
+
+.stage-card--upcoming {
+  opacity: .88;
+}
+
+.stage-card--upcoming:hover {
+  opacity: 1;
+}
+
+.stage-card-upcoming-badge {
+  font-size: .72rem;
+  font-weight: 600;
+  color: #4a8fd9;
+  background: rgba(74, 143, 217, .1);
+  border-radius: 4px;
+  padding: .1rem .4rem;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 700px) {

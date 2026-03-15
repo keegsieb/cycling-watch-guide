@@ -7,13 +7,18 @@ interface Props {
   raceSlug: string;
   stageIndex: number;
   isWomen?: boolean;
+  /** Override the link href (e.g. PCS URL for upcoming races linking externally). */
+  href?: string;
+  /** Show an "Upcoming" badge instead of community vote count. */
+  isUpcoming?: boolean;
 }
 
-const { stage, raceName, raceSlug, stageIndex, isWomen = false } = Astro.props;
+const { stage, raceName, raceSlug, stageIndex, isWomen = false, href: hrefOverride, isUpcoming = false } = Astro.props;
 
 const base = import.meta.env.BASE_URL;
-// Link directly to the individual stage page
-const href = `${base}race/${encodeURIComponent(raceSlug)}/${stageIndex}`;
+const computedHref = `${base}race/${encodeURIComponent(raceSlug)}/${stageIndex}`;
+const finalHref = hrefOverride ?? computedHref;
+const isExternal = finalHref.startsWith('http');
 
 function formatDate(d: string) {
   if (!d) return '';
@@ -25,7 +30,13 @@ function formatDate(d: string) {
 const dateStr = formatDate(stage.date);
 ---
 
-<a href={href} class="stage-card" data-stage-url={stage.url}>
+<a
+  href={finalHref}
+  class:list={['stage-card', isUpcoming && 'stage-card--upcoming']}
+  data-stage-url={stage.url}
+  target={isExternal ? '_blank' : undefined}
+  rel={isExternal ? 'noopener' : undefined}
+>
   {stage.profileImageUrl ? (
     <div class="stage-card-img">
       <img
@@ -34,8 +45,10 @@ const dateStr = formatDate(stage.date);
         loading="lazy"
         class="stage-card-profile"
       />
-      <!-- Community data overlay injected by JS -->
-      <div class="stage-card-overlay" data-stage-url={stage.url} aria-hidden="true"></div>
+      <!-- Community data overlay injected by JS (past stages only) -->
+      {!isUpcoming && (
+        <div class="stage-card-overlay" data-stage-url={stage.url} aria-hidden="true"></div>
+      )}
     </div>
   ) : (
     <div class="stage-card-img stage-card-img--missing">
@@ -56,9 +69,13 @@ const dateStr = formatDate(stage.date);
       {stage.distanceKm && (
         <span class="stage-card-dist">{stage.distanceKm} km</span>
       )}
-      <span class="stage-card-votes" data-stage-url={stage.url}>
-        <span class="votes-text">Loading…</span>
-      </span>
+      {isUpcoming ? (
+        <span class="stage-card-upcoming-badge">Upcoming ↗</span>
+      ) : (
+        <span class="stage-card-votes" data-stage-url={stage.url}>
+          <span class="votes-text">Loading…</span>
+        </span>
+      )}
     </div>
   </div>
 </a>

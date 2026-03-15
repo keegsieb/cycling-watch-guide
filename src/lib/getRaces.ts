@@ -8,14 +8,16 @@
  *      by Cloudflare but may work from GitHub Actions IPs)
  *   3. `src/data/seedRaces.ts`     — static fallback for local development
  *
- * After loading races from any source, stage profile images are enriched
- * via cyclingoo.com (not Cloudflare-protected, accessible at build time).
+ * After loading races, stage profile images are enriched in two passes:
+ *   1. Supabase `stage_profiles` table (one DB query, no external fetches)
+ *   2. cyclingoo.com fallback for any stages still missing an image
  */
 
-import type { Race } from './procyclingstats';
+import type { Race, Stage } from './procyclingstats';
 import { getRecentRaces } from './procyclingstats';
 import { SEED_RACES } from '../data/seedRaces';
 import { enrichRacesWithCyclingoo } from './cyclingoo';
+import { getStageProfilesByYear, type StageProfile } from './supabase';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
@@ -65,7 +67,14 @@ export async function getAllRaces(): Promise<{ races: Race[]; source: string }> 
     }
   }
 
-  // Enrich all races with profile images from cyclingoo
+  // Enrich stages with profile images from Supabase (one DB query, no external fetches)
+  try {
+    races = await enrichRacesWithSupabase(races);
+  } catch (err) {
+    console.error('[getRaces] supabase enrichment failed:', err);
+  }
+
+  // Fall back to cyclingoo for any stages still missing a profile image
   try {
     races = await enrichRacesWithCyclingoo(races);
   } catch (err) {
@@ -95,4 +104,44 @@ export async function getAllRaces(): Promise<{ races: Race[]; source: string }> 
     .filter((r) => r.stages.length > 0);
 
   return { races, source };
+}
+
+// ─── Supabase enrichment ─────────────────────────────────────────────────────
+
+/**
+ * Enrich races with profile images stored in the `stage_profiles` Supabase table.
+ * Matches on `stage_pcs_url` (exact URL match, trailing slash normalised).
+ * Also fills in `distanceKm` when not already set.
+ * Stages already having a `profileImageUrl` are left unchanged.
+ */
+async function enrichRacesWithSupabase(races: Race[]): Promise<Race[]> {
+  const year = new Date().getFullYear();
+  const profiles = await getStageProfilesByYear(year);
+  if (profiles.length === 0) {
+    console.log('[getRaces] no stage_profiles found in Supabase for', year);
+    return races;
+  }
+  console.log(`[getRaces] supabase: ${profiles.length} stage profiles loaded`);
+
+  // Build a lookup by normalised stage_pcs_url
+  const byUrl = new Map<string, StageProfile>();
+  for (const p of profiles) {
+    if (p.stage_pcs_url) {
+      byUrl.set(p.stage_pcs_url.replace(/\/$/, ''), p);
+    }
+  }
+
+  return races.map((race) => ({
+    ...race,
+    stages: race.stages.map((stage): Stage => {
+      const url = stage.url.replace(/\/$/, '');
+      const p = byUrl.get(url);
+      if (!p) return stage;
+      return {
+        ...stage,
+        profileImageUrl: stage.profileImageUrl ?? p.profile_image_url,
+        distanceKm: stage.distanceKm ?? (p.distance_km != null ? Number(p.distance_km) : null),
+      };
+    }),
+  }));
 }
