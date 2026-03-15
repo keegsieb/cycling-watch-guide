@@ -12,32 +12,6 @@ export const supabase =
 
 // ─── Database types ─────────────────────────────────────────────────────────
 
-export interface RaceRecord {
-  id: string;
-  name: string;
-  slug: string;
-  pcs_url: string;
-  start_date: string; // ISO date
-  end_date: string;
-  category: string;
-  country: string;
-  is_stage_race: boolean;
-  created_at: string;
-}
-
-export interface StageRecord {
-  id: string;
-  race_id: string;
-  label: string;
-  stage_url: string;
-  /** Direct URL to the profile image (if known) */
-  profile_image_url: string | null;
-  distance_km: number | null;
-  date: string;
-  stage_number: number | null;
-  created_at: string;
-}
-
 export interface WatchPoint {
   id: number;
   race_slug: string;
@@ -86,8 +60,6 @@ export interface StageProfile {
 
 /**
  * Returns all scraped stage profiles for a given year.
- * Used at build time to enrich race/stage objects with PCS profile images
- * before falling back to cyclingoo.
  */
 export async function getStageProfilesByYear(year: number): Promise<StageProfile[]> {
   if (!supabase) return [];
@@ -123,46 +95,6 @@ export async function getUpcomingStageProfiles(
     return [];
   }
   return (data ?? []) as StageProfile[];
-}
-
-// ─── Race fetching ───────────────────────────────────────────────────────────
-
-/**
- * Returns races from the last `days` days, stored in Supabase.
- * Returns an empty array if Supabase is not configured.
- */
-export async function getRecentRacesFromDB(days = 7): Promise<RaceRecord[]> {
-  if (!supabase) return [];
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const { data, error } = await supabase
-    .from('races')
-    .select('*')
-    .gte('end_date', cutoff.toISOString().slice(0, 10))
-    .lte('end_date', new Date().toISOString().slice(0, 10))
-    .order('end_date', { ascending: false });
-  if (error) {
-    console.error('getRecentRacesFromDB error:', error.message);
-    return [];
-  }
-  return (data ?? []) as RaceRecord[];
-}
-
-/**
- * Returns stages for a race from Supabase.
- */
-export async function getStagesFromDB(raceId: string): Promise<StageRecord[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('stages')
-    .select('*')
-    .eq('race_id', raceId)
-    .order('stage_number', { ascending: true });
-  if (error) {
-    console.error('getStagesFromDB error:', error.message);
-    return [];
-  }
-  return (data ?? []) as StageRecord[];
 }
 
 // ─── Watch-point voting ───────────────────────────────────────────────────────
