@@ -17,6 +17,10 @@ permissions:
   pages: write
   id-token: write
 
+# Opt into Node.js 24 for all actions (avoids Node 20 deprecation warnings)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # Only allow one deployment at a time
 concurrency:
   group: pages
