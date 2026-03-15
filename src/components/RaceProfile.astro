@@ -80,6 +80,11 @@ function formatDate(d: string) {
     )}
   </div>
 
+  <!-- Remove-vote button (shown by JS only when the user has voted) -->
+  <div class="remove-vote-wrap" data-stage-url={stage.url} style="display:none;">
+    <button class="remove-vote-btn">✕ Remove my vote</button>
+  </div>
+
   <!-- Community vote stats (populated by client JS) -->
   <div class="vote-stats" data-stage-url={stage.url}>
     <div class="vote-stats-loading">Loading community data…</div>

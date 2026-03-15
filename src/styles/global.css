@@ -467,6 +467,16 @@ a.stage-card:hover .stage-card-profile {
   letter-spacing: .01em;
 }
 
+.hint-submitted.profile-overlay-hint {
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .4rem 1.1rem;
+  white-space: normal;
+  text-align: center;
+  max-width: min(220px, 75%);
+  line-height: 1.3;
+}
+
 .profile-overlay:hover .profile-overlay-hint {
   opacity: 0;
 }
@@ -556,6 +566,35 @@ a.stage-card:hover .stage-card-profile {
   transform: translateX(-50%);
   border-radius: 2px 2px 0 0;
   pointer-events: none;
+}
+
+/* ── Remove-vote button ──────────────────────────────────────────────────── */
+
+.remove-vote-wrap {
+  display: flex;
+  justify-content: flex-end;
+  padding: .3rem 1.25rem .15rem;
+  background: #fafaf9;
+  border-top: 1px solid var(--border);
+}
+
+.remove-vote-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: .75rem;
+  cursor: pointer;
+  padding: .2rem .4rem;
+  border-radius: 4px;
+  transition: color .15s, background .15s;
+}
+.remove-vote-btn:hover {
+  color: #c0392b;
+  background: rgba(192,57,43,.08);
+}
+.remove-vote-btn:disabled {
+  opacity: .4;
+  cursor: default;
 }
 
 /* ── Vote stats ──────────────────────────────────────────────────────────── */

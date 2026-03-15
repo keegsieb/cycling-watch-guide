@@ -130,6 +130,23 @@ export async function submitWatchPoint(
 }
 
 /**
+ * Deletes the session's watch-point vote for a stage.
+ */
+export async function deleteWatchPoint(
+  stageUrl: string,
+  sessionId: string,
+): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase not configured' };
+  if (!sessionId) return { error: 'No session ID' };
+  const { error } = await supabase
+    .from('watch_points')
+    .delete()
+    .eq('stage_url', stageUrl)
+    .eq('session_id', sessionId);
+  return { error: error?.message ?? null };
+}
+
+/**
  * Submits a stage rating (1–10).
  */
 export async function submitRating(

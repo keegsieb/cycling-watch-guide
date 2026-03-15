@@ -89,7 +89,7 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
 </Layout>
 
 <script>
-  import { submitWatchPoint, submitRating, getWatchPoints, getRatings } from '../../../lib/supabase';
+  import { submitWatchPoint, deleteWatchPoint, submitRating, getWatchPoints, getRatings } from '../../../lib/supabase';
 
   // ── localStorage helpers ────────────────────────────────────────────────
   // Keys: "cww_session"            → persistent UUID for this browser
@@ -114,6 +114,9 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
   }
   function storeVote(stageUrl: string, pct: number) {
     localStorage.setItem(`cww_vote_${stageUrl}`, String(pct));
+  }
+  function clearVote(stageUrl: string) {
+    localStorage.removeItem(`cww_vote_${stageUrl}`);
   }
   function getStoredRating(stageUrl: string): number | null {
     const v = localStorage.getItem(`cww_rating_${stageUrl}`);
@@ -210,6 +213,27 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       }
     }
 
+    // Remove-vote button wiring
+    const removeWrap = document.querySelector<HTMLElement>(
+      `.remove-vote-wrap[data-stage-url="${CSS.escape(stageUrl)}"]`
+    );
+    const removeBtn = removeWrap?.querySelector<HTMLButtonElement>('.remove-vote-btn');
+
+    function showRemoveBtn() {
+      if (removeWrap) removeWrap.style.display = 'flex';
+    }
+    function hideRemoveBtn() {
+      if (removeWrap) removeWrap.style.display = 'none';
+    }
+
+    function clearVoteUI() {
+      marker.style.display = 'none';
+      watchFill.style.display = 'none';
+      hint.textContent = 'Click to mark where it gets exciting';
+      hint.classList.remove('hint-submitted');
+      hideRemoveBtn();
+    }
+
     // Restore previous vote marker (overlay stays interactive — click to update)
     const previousVote = getStoredVote(stageUrl);
     if (previousVote !== null) {
@@ -220,7 +244,49 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       watchFill.style.display = 'block';
       hint.textContent = '✓ Voted · click to update';
       hint.classList.add('hint-submitted');
+      showRemoveBtn();
     }
+
+    removeBtn?.addEventListener('click', async () => {
+      removeBtn.disabled = true;
+      const { error } = await deleteWatchPoint(stageUrl, getSessionId());
+      if (error) {
+        removeBtn.disabled = false;
+        return;
+      }
+      clearVote(stageUrl);
+      clearVoteUI();
+      // Refresh community ticks/stats
+      const { median, count, values } = await getWatchPoints(stageUrl);
+      ticksEl.innerHTML = '';
+      if (values.length > 0) renderTicks(ticksEl, values);
+      if (median !== null) {
+        consensusLine.style.left = toLeft(median);
+        consensusLine.style.display = 'block';
+        const label = distanceKm
+          ? `Watch from ${Math.round((median / 100) * distanceKm)} km to go · ${count} vote${count !== 1 ? 's' : ''}`
+          : `Last ${median.toFixed(0)}% · ${count} vote${count !== 1 ? 's' : ''}`;
+        consensusLabel.textContent = label;
+        consensusLabel.style.display = 'block';
+      } else {
+        consensusLine.style.display = 'none';
+        consensusLabel.style.display = 'none';
+      }
+      if (statsEl) {
+        if (median !== null) {
+          const kmText = distanceKm
+            ? `${Math.round((median / 100) * distanceKm)} km from the finish`
+            : `${median.toFixed(0)}% from the finish`;
+          statsEl.innerHTML = `
+            <div class="vote-summary">
+              <span class="vote-count-badge">${count} vote${count !== 1 ? 's' : ''}</span>
+              Community says: start watching from <strong>${kmText}</strong>.
+            </div>`;
+        } else {
+          statsEl.innerHTML = `<div class="vote-summary no-votes">No votes yet — be the first to click the profile above!</div>`;
+        }
+      }
+    });
 
     async function handleVote(e: MouseEvent | KeyboardEvent) {
       if (e instanceof KeyboardEvent && e.key !== 'Enter' && e.key !== ' ') return;
@@ -239,6 +305,7 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       hint.textContent = '✓ Voted · click to update';
       hint.classList.add('hint-submitted');
       storeVote(stageUrl, pctFromFinish);
+      showRemoveBtn();
 
       await submitWatchPoint(raceSlug, stageUrl, pctFromFinish, getSessionId());
     }
