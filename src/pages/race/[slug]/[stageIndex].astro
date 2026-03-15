@@ -110,6 +110,48 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
     localStorage.setItem(`cww_rating_${stageUrl}`, String(value));
   }
 
+  // ── PCS profile image offsets ────────────────────────────────────────────
+  // PCS images include ~6.5% left margin (elevation axis) + ~2% right margin.
+  // All pctFromFinish values stored in the DB are in "profile space" (i.e. after
+  // stripping the margins), so the same constant must be applied when displaying.
+  const PROFILE_LEFT  = 0.065;
+  const PROFILE_RIGHT = 0.020;
+  const PROFILE_W     = 1 - PROFILE_LEFT - PROFILE_RIGHT;
+
+  /** Raw image x-fraction (0–1) → pctFromFinish in profile space (0–100). */
+  function toPct(rawX: number): number {
+    const adj = Math.max(0, Math.min(1, (rawX - PROFILE_LEFT) / PROFILE_W));
+    return Math.round((1 - adj) * 1000) / 10;
+  }
+
+  /** pctFromFinish (0–100) → CSS left% on the full image. */
+  function toLeft(pct: number): string {
+    const adj = 1 - pct / 100;
+    return `${(PROFILE_LEFT + adj * PROFILE_W) * 100}%`;
+  }
+
+  /** Render per-vote tick marks; height/opacity scales with local density. */
+  function renderTicks(container: HTMLElement, values: number[]) {
+    // Bin each vote into a 1%-wide bucket in image space
+    const bins = new Map<number, number>();
+    for (const v of values) {
+      const imageX = PROFILE_LEFT + (1 - v / 100) * PROFILE_W;
+      const bin = Math.round(imageX * 100); // 0–100 integer
+      bins.set(bin, (bins.get(bin) ?? 0) + 1);
+    }
+    const maxCount = Math.max(...bins.values(), 1);
+    const minH = 8, maxH = 34;
+    container.innerHTML = '';
+    for (const [bin, count] of bins) {
+      const tick = document.createElement('div');
+      tick.className = 'vote-tick';
+      tick.style.left = `${bin}%`;
+      tick.style.height = `${minH + (count / maxCount) * (maxH - minH)}px`;
+      tick.style.opacity = String(0.45 + (count / maxCount) * 0.55);
+      container.appendChild(tick);
+    }
+  }
+
   // ── Watch-point overlay ─────────────────────────────────────────────────
 
   async function initProfileOverlay(overlay: HTMLElement) {
@@ -119,19 +161,16 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
 
     const marker         = overlay.querySelector<HTMLElement>('.vote-marker')!;
     const watchFill      = overlay.querySelector<HTMLElement>('.watch-fill')!;
-    const consensusFill  = overlay.querySelector<HTMLElement>('.consensus-fill')!;
+    const ticksEl        = overlay.querySelector<HTMLElement>('.vote-ticks')!;
     const consensusLine  = overlay.querySelector<HTMLElement>('.consensus-line')!;
     const consensusLabel = overlay.querySelector<HTMLElement>('.consensus-label')!;
     const hint           = overlay.querySelector<HTMLElement>('.profile-overlay-hint')!;
 
-    // Show community consensus
-    const { median, count } = await getWatchPoints(stageUrl);
+    // Load community data and render ticks + median line
+    const { median, count, values } = await getWatchPoints(stageUrl);
+    if (values.length > 0) renderTicks(ticksEl, values);
     if (median !== null) {
-      const leftPct = 100 - median;
-      consensusFill.style.left = `${leftPct}%`;
-      consensusFill.style.right = '0';
-      consensusFill.style.display = 'block';
-      consensusLine.style.left = `${leftPct}%`;
+      consensusLine.style.left = toLeft(median);
       consensusLine.style.display = 'block';
       const label = distanceKm
         ? `Watch from ${Math.round((median / 100) * distanceKm)} km to go · ${count} vote${count !== 1 ? 's' : ''}`
@@ -158,52 +197,37 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       }
     }
 
-    // If already voted, restore the user's marker and lock the overlay
+    // Restore previous vote marker (overlay stays interactive — click to update)
     const previousVote = getStoredVote(stageUrl);
     if (previousVote !== null) {
-      const xFraction = 1 - previousVote / 100;
-      marker.style.left = `${xFraction * 100}%`;
+      marker.style.left = toLeft(previousVote);
       marker.style.display = 'block';
-      watchFill.style.left = `${xFraction * 100}%`;
+      watchFill.style.left = toLeft(previousVote);
       watchFill.style.right = '0';
       watchFill.style.display = 'block';
-      hint.textContent = '✓ Already voted';
+      hint.textContent = '✓ Voted · click to update';
       hint.classList.add('hint-submitted');
-      overlay.style.cursor = 'default';
-      return; // no click handler attached — voting locked
     }
 
     async function handleVote(e: MouseEvent | KeyboardEvent) {
       if (e instanceof KeyboardEvent && e.key !== 'Enter' && e.key !== ' ') return;
       const rect = overlay.getBoundingClientRect();
       const clientX = e instanceof MouseEvent ? e.clientX : rect.left + rect.width / 2;
-      const xFraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      const pctFromFinish = Math.round((1 - xFraction) * 1000) / 10;
+      const rawX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const pctFromFinish = toPct(rawX);
+      const imageLeft = toLeft(pctFromFinish);
 
-      // Immediately lock the overlay so double-clicks can't sneak through
-      overlay.removeEventListener('click', handleVote);
-      overlay.removeEventListener('keydown', handleVote);
-      overlay.style.cursor = 'default';
-
-      marker.style.left = `${xFraction * 100}%`;
+      // Update UI immediately
+      marker.style.left = imageLeft;
       marker.style.display = 'block';
-      watchFill.style.left = `${xFraction * 100}%`;
+      watchFill.style.left = imageLeft;
       watchFill.style.right = '0';
       watchFill.style.display = 'block';
-      hint.textContent = '✓ Voted!';
+      hint.textContent = '✓ Voted · click to update';
       hint.classList.add('hint-submitted');
+      storeVote(stageUrl, pctFromFinish);
 
-      const { error } = await submitWatchPoint(raceSlug, stageUrl, pctFromFinish);
-      if (error) {
-        hint.textContent = `Could not save: ${error}`;
-        hint.classList.remove('hint-submitted');
-        // Re-attach handler so they can try again if it was a transient error
-        overlay.addEventListener('click', handleVote);
-        overlay.addEventListener('keydown', handleVote);
-        overlay.style.cursor = '';
-      } else {
-        storeVote(stageUrl, pctFromFinish); // persist so re-visits stay locked
-      }
+      await submitWatchPoint(raceSlug, stageUrl, pctFromFinish);
     }
 
     overlay.addEventListener('click', handleVote);

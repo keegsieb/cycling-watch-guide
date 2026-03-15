@@ -138,12 +138,12 @@ export async function submitRating(
 
 /**
  * Returns aggregated watch point data for a stage.
- * median + count
+ * Returns median, count, and the raw sorted values array.
  */
 export async function getWatchPoints(
   stageUrl: string
-): Promise<{ median: number | null; count: number }> {
-  if (!supabase) return { median: null, count: 0 };
+): Promise<{ median: number | null; count: number; values: number[] }> {
+  if (!supabase) return { median: null, count: 0, values: [] };
 
   const { data, error } = await supabase
     .from('watch_points')
@@ -151,7 +151,7 @@ export async function getWatchPoints(
     .eq('stage_url', stageUrl);
 
   if (error || !data || data.length === 0) {
-    return { median: null, count: 0 };
+    return { median: null, count: 0, values: [] };
   }
 
   const values = (data as { pct_from_finish: number }[])
@@ -161,7 +161,7 @@ export async function getWatchPoints(
   const median =
     values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid];
 
-  return { median, count: values.length };
+  return { median, count: values.length, values };
 }
 
 /**

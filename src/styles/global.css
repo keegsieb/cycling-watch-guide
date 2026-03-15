@@ -488,16 +488,6 @@ a.stage-card:hover .stage-card-profile {
   box-shadow: inset 0 0 20px rgba(214,59,47,.1);
 }
 
-/* Community consensus fill */
-.consensus-fill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: rgba(42, 125, 79, 0.12);
-  pointer-events: none;
-  border-left: 2.5px solid var(--green);
-}
-
 /* User vote marker */
 .vote-marker {
   position: absolute;
@@ -545,6 +535,27 @@ a.stage-card:hover .stage-card-profile {
   font-size: .875rem;
   color: var(--muted);
   background: #f8f6f3;
+}
+
+/* ── Vote ticks (per-vote density strip at base of profile) ──────────────── */
+
+.vote-ticks {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  pointer-events: none;
+}
+
+.vote-tick {
+  position: absolute;
+  bottom: 0;
+  width: 3px;
+  background: var(--green);
+  transform: translateX(-50%);
+  border-radius: 2px 2px 0 0;
+  pointer-events: none;
 }
 
 /* ── Vote stats ──────────────────────────────────────────────────────────── */
