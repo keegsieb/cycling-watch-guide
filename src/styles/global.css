@@ -486,6 +486,40 @@ a.stage-card:hover .stage-card-profile {
   opacity: 1 !important;
 }
 
+/* ── Vote confidence band (p25–p75 shaded region) ───────────────────────── */
+
+.vote-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(42,125,79,.13);
+  border-left: 1.5px dashed rgba(42,125,79,.5);
+  border-right: 1.5px dashed rgba(42,125,79,.5);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Worth-watching card badges ──────────────────────────────────────────── */
+
+.vote-badge {
+  display: none;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .15rem .45rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.vote-badge--fire {
+  display: inline-block;
+  background: rgba(214,59,47,.12);
+  color: #b83228;
+}
+.vote-badge--sprint {
+  display: inline-block;
+  background: rgba(42,125,79,.12);
+  color: var(--green);
+}
+
 /* ── Vote fill (the "worth watching" zone) ───────────────────────────────── */
 
 .watch-fill {
@@ -752,6 +786,34 @@ a.stage-card:hover .stage-card-profile {
 
 .stage-page-date {
   color: var(--muted);
+}
+
+/* ── Share button ────────────────────────────────────────────────────────── */
+
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: .2rem .75rem;
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+  margin-left: auto;
+}
+.share-btn:hover {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(42,125,79,.06);
+}
+.share-btn--copied {
+  border-color: var(--green) !important;
+  color: var(--green) !important;
+  background: rgba(42,125,79,.1) !important;
 }
 
 /* ── Stage navigation ────────────────────────────────────────────────────── */

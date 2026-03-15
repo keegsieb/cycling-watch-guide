@@ -59,6 +59,9 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       {stage.date && <span class="stage-page-date">{formatDate(stage.date)}</span>}
       {stage.distanceKm && <span class="stage-distance">{stage.distanceKm} km</span>}
       {race.category && <span class="race-cat">{race.category}</span>}
+      <button id="share-btn" class="share-btn" aria-label="Copy link to this stage">
+        🔗 Share
+      </button>
     </div>
   </div>
 
@@ -177,14 +180,28 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
 
     const marker         = overlay.querySelector<HTMLElement>('.vote-marker')!;
     const watchFill      = overlay.querySelector<HTMLElement>('.watch-fill')!;
+    const bandEl         = overlay.querySelector<HTMLElement>('.vote-band')!;
     const ticksEl        = overlay.querySelector<HTMLElement>('.vote-ticks')!;
     const consensusLine  = overlay.querySelector<HTMLElement>('.consensus-line')!;
     const consensusLabel = overlay.querySelector<HTMLElement>('.consensus-label')!;
     const hint           = overlay.querySelector<HTMLElement>('.profile-overlay-hint')!;
 
-    // Load community data and render ticks + median line
+    /** Render the p25–p75 confidence band (needs ≥3 votes). */
+    function renderBand(values: number[]) {
+      if (values.length < 3) { bandEl.style.display = 'none'; return; }
+      const p25 = values[Math.floor(values.length * 0.25)];
+      const p75 = values[Math.floor(values.length * 0.75)];
+      // p75 is further from finish → further LEFT on the image
+      bandEl.style.left  = toLeft(p75);
+      // right edge: distance from right = PROFILE_RIGHT + (p25/100)*PROFILE_W
+      bandEl.style.right = `${(PROFILE_RIGHT + (p25 / 100) * PROFILE_W) * 100}%`;
+      bandEl.style.display = 'block';
+    }
+
+    // Load community data and render ticks + median line + confidence band
     const { median, count, values } = await getWatchPoints(stageUrl);
     if (values.length > 0) renderTicks(ticksEl, values);
+    renderBand(values);
     if (median !== null) {
       consensusLine.style.left = toLeft(median);
       consensusLine.style.display = 'block';
@@ -256,10 +273,11 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       }
       clearVote(stageUrl);
       clearVoteUI();
-      // Refresh community ticks/stats
+      // Refresh community ticks/stats/band
       const { median, count, values } = await getWatchPoints(stageUrl);
       ticksEl.innerHTML = '';
       if (values.length > 0) renderTicks(ticksEl, values);
+      renderBand(values);
       if (median !== null) {
         consensusLine.style.left = toLeft(median);
         consensusLine.style.display = 'block';
@@ -366,4 +384,27 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
 
   document.querySelectorAll<HTMLElement>('.profile-overlay').forEach(initProfileOverlay);
   document.querySelectorAll<HTMLElement>('.rating-section').forEach(initRatingWidget);
+
+  // ── Share button ─────────────────────────────────────────────────────────
+  const shareBtn = document.getElementById('share-btn') as HTMLButtonElement | null;
+  shareBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      const orig = shareBtn.textContent!;
+      shareBtn.textContent = '✓ Copied!';
+      shareBtn.classList.add('share-btn--copied');
+      setTimeout(() => {
+        shareBtn.textContent = orig;
+        shareBtn.classList.remove('share-btn--copied');
+      }, 2000);
+    } catch {
+      // Fallback: select a temporary input
+      const inp = document.createElement('input');
+      inp.value = window.location.href;
+      document.body.appendChild(inp);
+      inp.select();
+      document.execCommand('copy');
+      document.body.removeChild(inp);
+    }
+  });
 </script>

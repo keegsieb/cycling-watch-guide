@@ -227,15 +227,25 @@ const futureEntries: FutureEntry[] = upcomingProfiles.map((p) => ({
 <script>
   import { getWatchPoints } from '../lib/supabase';
 
-  // Load community vote counts for all stage cards
+  // Load community vote counts + worth-watching badge for all stage cards
   async function loadVoteCounts() {
     const cards = document.querySelectorAll<HTMLElement>('.stage-card-votes[data-stage-url]');
     await Promise.all(Array.from(cards).map(async (el) => {
       const stageUrl = el.dataset.stageUrl!;
       const { median, count } = await getWatchPoints(stageUrl);
-      const text = el.querySelector('.votes-text')!;
+      const text = el.querySelector<HTMLElement>('.votes-text')!;
+      const badge = el.querySelector<HTMLElement>('.vote-badge');
       if (median !== null) {
         text.textContent = `${count} vote${count !== 1 ? 's' : ''} · watch last ${median.toFixed(0)}%`;
+        if (badge) {
+          if (median >= 50) {
+            badge.textContent = '🔥 Full race';
+            badge.className = 'vote-badge vote-badge--fire';
+          } else if (median <= 10) {
+            badge.textContent = '🏁 Sprint finish';
+            badge.className = 'vote-badge vote-badge--sprint';
+          }
+        }
       } else {
         text.textContent = 'No votes yet';
       }
