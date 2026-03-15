@@ -12,9 +12,8 @@ interface Props {
 const { stage, raceName, raceSlug, stageIndex, isWomen = false } = Astro.props;
 
 const base = import.meta.env.BASE_URL;
-// Link to the race page, scrolling to the specific stage section
-const stageId = `stage-${stageIndex}`;
-const href = `${base}race/${encodeURIComponent(raceSlug)}#${stageId}`;
+// Link directly to the individual stage page
+const href = `${base}race/${encodeURIComponent(raceSlug)}/${stageIndex}`;
 
 function formatDate(d: string) {
   if (!d) return '';

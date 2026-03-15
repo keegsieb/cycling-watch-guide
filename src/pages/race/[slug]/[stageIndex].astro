@@ -1,89 +1,99 @@
 ---
-import Layout from '../../layouts/Layout.astro';
-import RaceProfile from '../../components/RaceProfile.astro';
-import { getAllRaces } from '../../lib/getRaces';
-import type { Race } from '../../lib/procyclingstats';
+import Layout from '../../../layouts/Layout.astro';
+import RaceProfile from '../../../components/RaceProfile.astro';
+import { getAllRaces } from '../../../lib/getRaces';
+import type { Race } from '../../../lib/procyclingstats';
 
 export async function getStaticPaths() {
   const { races } = await getAllRaces();
-  return races.map((race) => ({
-    params: { slug: race.slug },
-    props: { race },
-  }));
+  const paths: { params: { slug: string; stageIndex: string }; props: { race: Race; stageIndex: number } }[] = [];
+
+  for (const race of races) {
+    race.stages.forEach((_, i) => {
+      paths.push({
+        params: { slug: race.slug, stageIndex: String(i) },
+        props: { race, stageIndex: i },
+      });
+    });
+  }
+
+  return paths;
 }
 
-const { race: raceBase } = Astro.props as { race: Race };
-let race: Race = raceBase;
-
-if (race.stages.length === 0) {
-  race = {
-    ...race,
-    stages: [{
-      name: race.name,
-      label: race.startDate === race.endDate ? race.name : `${race.name} (all stages)`,
-      url: race.url,
-      profileImageUrl: null,
-      distanceKm: null,
-      date: race.endDate,
-    }],
-  };
-}
+const { race, stageIndex } = Astro.props as { race: Race; stageIndex: number };
+const stage = race.stages[stageIndex];
 
 function formatDate(d: string) {
   if (!d) return '';
   return new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'long', year: 'numeric',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 }
 
-const isStageRace = race.startDate !== race.endDate;
 const base = import.meta.env.BASE_URL;
+const raceUrl = `${base}race/${encodeURIComponent(race.slug)}`;
+const totalStages = race.stages.length;
+const isStageRace = race.startDate !== race.endDate;
+const prevStage = stageIndex > 0 ? `${base}race/${encodeURIComponent(race.slug)}/${stageIndex - 1}` : null;
+const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURIComponent(race.slug)}/${stageIndex + 1}` : null;
 ---
 
 <Layout
-  title={race.name}
-  description={`Community watch guide for ${race.name}. How many km are worth watching?`}
+  title={`${stage.label} — ${race.name}`}
+  description={`Community watch guide for ${stage.label} of ${race.name}. How many km are worth watching?`}
 >
   <nav class="breadcrumb">
     <a href={`${base}`}>← All stages</a>
+    {isStageRace && (
+      <>
+        <span class="breadcrumb-sep">·</span>
+        <a href={raceUrl}>{race.name}</a>
+      </>
+    )}
   </nav>
 
-  <div class="race-page-header">
-    <h1>{race.name}</h1>
-    <div class="race-dates">
-      {isStageRace ? (
-        <span>{formatDate(race.startDate)} – {formatDate(race.endDate)}</span>
-      ) : (
-        <span>{formatDate(race.endDate)}</span>
-      )}
+  <div class="stage-page-header">
+    <div class="stage-page-race">{race.name}</div>
+    <h1 class="stage-page-title">{stage.label}</h1>
+    <div class="stage-page-meta">
+      {stage.date && <span class="stage-page-date">{formatDate(stage.date)}</span>}
+      {stage.distanceKm && <span class="stage-distance">{stage.distanceKm} km</span>}
       {race.category && <span class="race-cat">{race.category}</span>}
     </div>
-    <a href={race.url} target="_blank" rel="noopener" class="pcs-link">
-      View on ProCyclingStats ↗
-    </a>
   </div>
 
   <div class="how-to-use">
     <span class="how-to-icon">👆</span>
     <span>
-      <strong>Click the profile</strong> to mark where the race gets exciting.
-      <strong>Rate below</strong> after watching. Green line = community start point.
+      <strong>Click the profile</strong> to mark where it gets exciting.
+      <strong>Rate below</strong> after watching. Green = community consensus.
     </span>
   </div>
 
-  <div class="stages-list">
-    {race.stages.map((stage, i) => (
-      <RaceProfile stage={stage} raceSlug={race.slug} stageIndex={i} />
-    ))}
-  </div>
+  <!-- Single stage -->
+  <RaceProfile stage={stage} raceSlug={race.slug} stageIndex={stageIndex} />
+
+  <!-- Stage navigation for multi-stage races -->
+  {isStageRace && (prevStage || nextStage) && (
+    <nav class="stage-nav">
+      {prevStage ? (
+        <a href={prevStage} class="stage-nav-btn stage-nav-prev">← {race.stages[stageIndex - 1]?.label ?? 'Previous'}</a>
+      ) : (
+        <span></span>
+      )}
+      {nextStage && (
+        <a href={nextStage} class="stage-nav-btn stage-nav-next">{race.stages[stageIndex + 1]?.label ?? 'Next'} →</a>
+      )}
+    </nav>
+  )}
 </Layout>
 
 <script>
-  import { submitWatchPoint, submitRating, getWatchPoints, getRatings } from '../../lib/supabase';
+  import { submitWatchPoint, submitRating, getWatchPoints, getRatings } from '../../../lib/supabase';
 
   async function initProfileOverlay(overlay: HTMLElement) {
-    const stageUrl = overlay.dataset.stageUrl!;
-    const raceSlug = overlay.dataset.raceSlug!;
+    const stageUrl   = overlay.dataset.stageUrl!;
+    const raceSlug   = overlay.dataset.raceSlug!;
     const distanceKm = overlay.dataset.distanceKm ? parseFloat(overlay.dataset.distanceKm) : null;
 
     const marker         = overlay.querySelector<HTMLElement>('.vote-marker')!;
@@ -153,8 +163,8 @@ const base = import.meta.env.BASE_URL;
   }
 
   async function initRatingWidget(section: HTMLElement) {
-    const stageUrl  = section.dataset.stageUrl!;
-    const raceSlug  = section.dataset.raceSlug!;
+    const stageUrl   = section.dataset.stageUrl!;
+    const raceSlug   = section.dataset.raceSlug!;
     const averageEl  = section.querySelector<HTMLElement>('.rating-average')!;
     const countEl    = section.querySelector<HTMLElement>('.rating-count')!;
     const feedbackEl = section.querySelector<HTMLElement>('.rating-feedback')!;
@@ -184,13 +194,6 @@ const base = import.meta.env.BASE_URL;
     });
   }
 
-  function scrollToHash() {
-    if (!window.location.hash) return;
-    const target = document.querySelector(window.location.hash);
-    if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-  }
-
   document.querySelectorAll<HTMLElement>('.profile-overlay').forEach(initProfileOverlay);
   document.querySelectorAll<HTMLElement>('.rating-section').forEach(initRatingWidget);
-  scrollToHash();
 </script>
