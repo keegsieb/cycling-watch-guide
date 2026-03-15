@@ -106,13 +106,25 @@ export async function getUpcomingStageProfiles(
 export async function submitWatchPoint(
   raceSlug: string,
   stageUrl: string,
-  pctFromFinish: number
+  pctFromFinish: number,
+  sessionId: string,
 ): Promise<{ error: string | null }> {
   if (!supabase) return { error: 'Supabase not configured' };
+
+  // Delete any previous vote from this session for this stage (vote replacement)
+  if (sessionId) {
+    await supabase
+      .from('watch_points')
+      .delete()
+      .eq('stage_url', stageUrl)
+      .eq('session_id', sessionId);
+  }
+
   const { error } = await supabase.from('watch_points').insert({
     race_slug: raceSlug,
     stage_url: stageUrl,
     pct_from_finish: Math.round(pctFromFinish * 10) / 10,
+    session_id: sessionId,
   });
   return { error: error?.message ?? null };
 }

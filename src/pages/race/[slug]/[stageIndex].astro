@@ -92,8 +92,21 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
   import { submitWatchPoint, submitRating, getWatchPoints, getRatings } from '../../../lib/supabase';
 
   // ── localStorage helpers ────────────────────────────────────────────────
-  // Keys: "cww_vote_<stageUrl>"   → stored pctFromFinish (number as string)
+  // Keys: "cww_session"            → persistent UUID for this browser
+  //        "cww_vote_<stageUrl>"   → stored pctFromFinish (number as string)
   //        "cww_rating_<stageUrl>" → stored rating value (number as string)
+
+  function getSessionId(): string {
+    let id = localStorage.getItem('cww_session');
+    if (!id) {
+      // crypto.randomUUID is available in all modern browsers; simple fallback for old ones
+      id = typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : Date.now().toString(36) + Math.random().toString(36).slice(2);
+      localStorage.setItem('cww_session', id);
+    }
+    return id;
+  }
 
   function getStoredVote(stageUrl: string): number | null {
     const v = localStorage.getItem(`cww_vote_${stageUrl}`);
@@ -227,7 +240,7 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       hint.classList.add('hint-submitted');
       storeVote(stageUrl, pctFromFinish);
 
-      await submitWatchPoint(raceSlug, stageUrl, pctFromFinish);
+      await submitWatchPoint(raceSlug, stageUrl, pctFromFinish, getSessionId());
     }
 
     overlay.addEventListener('click', handleVote);
