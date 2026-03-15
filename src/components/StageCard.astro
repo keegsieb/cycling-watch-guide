@@ -11,9 +11,11 @@ interface Props {
   href?: string;
   /** Show an "Upcoming" badge instead of community vote count. */
   isUpcoming?: boolean;
+  /** Compact horizontal layout for older/past-week cards. */
+  isCompact?: boolean;
 }
 
-const { stage, raceName, raceSlug, stageIndex, isWomen = false, href: hrefOverride, isUpcoming = false } = Astro.props;
+const { stage, raceName, raceSlug, stageIndex, isWomen = false, href: hrefOverride, isUpcoming = false, isCompact = false } = Astro.props;
 
 const base = import.meta.env.BASE_URL;
 const computedHref = `${base}race/${encodeURIComponent(raceSlug)}/${stageIndex}`;
@@ -32,7 +34,7 @@ const dateStr = formatDate(stage.date);
 
 <a
   href={finalHref}
-  class:list={['stage-card', isUpcoming && 'stage-card--upcoming']}
+  class:list={['stage-card', isUpcoming && 'stage-card--upcoming', isCompact && 'stage-card--compact']}
   data-stage-url={stage.url}
   target={isExternal ? '_blank' : undefined}
   rel={isExternal ? 'noopener' : undefined}
@@ -52,7 +54,7 @@ const dateStr = formatDate(stage.date);
     </div>
   ) : (
     <div class="stage-card-img stage-card-img--missing">
-      <span>Profile loading…</span>
+      <span>{isUpcoming ? 'No profile yet' : 'Profile unavailable'}</span>
     </div>
   )}
 

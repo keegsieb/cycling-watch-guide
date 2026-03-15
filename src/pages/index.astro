@@ -50,8 +50,36 @@ const builtAt = new Date().toLocaleDateString('en-GB', {
   hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
 });
 
+// ── Date buckets ──────────────────────────────────────────────────────────────
+const todayIso     = new Date().toISOString().slice(0, 10);
+const yesterdayIso = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const weekAgoIso   = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+function formatDayLabel(iso: string): string {
+  if (iso === todayIso)     return 'Today';
+  if (iso === yesterdayIso) return 'Yesterday';
+  if (iso === 'unknown')    return 'Recent';
+  return new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+}
+
+// Split: within the last week vs older
+const recentEntries = stageEntries.filter(e => !e.stage.date || e.stage.date >= weekAgoIso);
+const olderEntries  = stageEntries.filter(e =>  e.stage.date && e.stage.date <  weekAgoIso);
+
+// Group recent entries by date, newest-first
+const dayGroupMap = new Map<string, StageEntry[]>();
+for (const e of recentEntries) {
+  const d = e.stage.date || 'unknown';
+  if (!dayGroupMap.has(d)) dayGroupMap.set(d, []);
+  dayGroupMap.get(d)!.push(e);
+}
+const dayGroups = [...dayGroupMap.entries()]
+  .sort((a, b) => b[0].localeCompare(a[0]))
+  .map(([date, entries]) => ({ date, entries }));
+
 // ── Upcoming races ────────────────────────────────────────────────────────────
-const todayIso = new Date().toISOString().slice(0, 10);
 const upcomingProfiles = await getUpcomingStageProfiles(new Date().getFullYear(), todayIso);
 
 interface FutureEntry {
@@ -102,18 +130,69 @@ const futureEntries: FutureEntry[] = upcomingProfiles.map((p) => ({
     </div>
   )}
 
-  {stageEntries.length > 0 && (
-    <div class="stage-grid">
-      {stageEntries.map((e) => (
-        <StageCard
-          stage={e.stage}
-          raceName={e.raceName}
-          raceSlug={e.raceSlug}
-          stageIndex={e.stageIndex}
-          isWomen={e.isWomen}
-        />
-      ))}
-    </div>
+  {dayGroups.map(({ date, entries }) => {
+    const isToday = date === todayIso;
+    return (
+      <div class="day-section">
+        <h2 class:list={['day-heading', isToday ? 'day-heading--today' : 'day-heading--past']}>
+          {formatDayLabel(date)}
+        </h2>
+        {isToday ? (
+          <div class="stage-grid">
+            {entries.map((e) => (
+              <StageCard
+                stage={e.stage}
+                raceName={e.raceName}
+                raceSlug={e.raceSlug}
+                stageIndex={e.stageIndex}
+                isWomen={e.isWomen}
+              />
+            ))}
+          </div>
+        ) : (
+          <div class="compact-list">
+            {entries.map((e) => (
+              <StageCard
+                stage={e.stage}
+                raceName={e.raceName}
+                raceSlug={e.raceSlug}
+                stageIndex={e.stageIndex}
+                isWomen={e.isWomen}
+                isCompact
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  })}
+
+  {olderEntries.length > 0 && (
+    <>
+      <div class="show-future-wrap">
+        <button id="show-older-btn" class="show-future-btn">
+          Show older races
+          <span class="show-future-count">{olderEntries.length}</span>
+        </button>
+      </div>
+      <section id="older-races" hidden>
+        <div class="day-section">
+          <h2 class="day-heading day-heading--past">Older</h2>
+          <div class="compact-list">
+            {olderEntries.map((e) => (
+              <StageCard
+                stage={e.stage}
+                raceName={e.raceName}
+                raceSlug={e.raceSlug}
+                stageIndex={e.stageIndex}
+                isWomen={e.isWomen}
+                isCompact
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
   )}
 
   {futureEntries.length > 0 && (
@@ -164,6 +243,14 @@ const futureEntries: FutureEntry[] = upcomingProfiles.map((p) => ({
   }
 
   loadVoteCounts();
+
+  // Show older races toggle
+  const olderBtn = document.getElementById('show-older-btn');
+  const olderSection = document.getElementById('older-races');
+  olderBtn?.addEventListener('click', () => {
+    olderSection?.removeAttribute('hidden');
+    olderBtn.style.display = 'none';
+  });
 
   // Show future races toggle
   const showBtn = document.getElementById('show-future-btn');

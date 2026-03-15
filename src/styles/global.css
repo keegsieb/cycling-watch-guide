@@ -740,6 +740,82 @@ a.stage-card:hover .stage-card-profile {
 .stage-nav-prev { margin-right: auto; }
 .stage-nav-next { margin-left: auto; }
 
+/* ── Day sections (home page) ────────────────────────────────────────────── */
+
+.day-section {
+  margin-bottom: 2rem;
+}
+
+.day-heading {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+  margin-bottom: 1rem;
+  padding-bottom: .4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.day-heading--today {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.day-heading--past {
+  margin-bottom: .65rem;
+}
+
+/* ── Compact stage card ───────────────────────────────────────────────────── */
+
+.compact-list {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+}
+
+a.stage-card--compact {
+  flex-direction: row;
+  align-items: stretch;
+  height: 72px;
+}
+
+a.stage-card--compact .stage-card-img {
+  width: 150px;
+  flex-shrink: 0;
+  aspect-ratio: unset;
+  height: 100%;
+}
+
+a.stage-card--compact .stage-card-img--missing {
+  font-size: .72rem;
+}
+
+a.stage-card--compact .stage-card-body {
+  padding: .5rem .85rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: .15rem;
+}
+
+a.stage-card--compact .stage-card-top {
+  margin-bottom: 0;
+}
+
+a.stage-card--compact .stage-card-race {
+  font-size: .875rem;
+}
+
+a.stage-card--compact .stage-card-label {
+  font-size: .75rem;
+}
+
+a.stage-card--compact .stage-card-meta {
+  font-size: .72rem;
+  gap: .4rem;
+}
+
 /* ── Show future races button ────────────────────────────────────────────── */
 
 .show-future-wrap {
@@ -828,4 +904,6 @@ a.stage-card:hover .stage-card-profile {
 
   .rating-row { gap: .4rem; }
   .star-btn { width: 1.75rem; height: 1.75rem; font-size: .75rem; }
+
+  a.stage-card--compact .stage-card-img { width: 110px; }
 }
