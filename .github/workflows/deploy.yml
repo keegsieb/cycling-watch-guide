@@ -29,25 +29,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Python step: fetch race data from ProCyclingStats ─────────────────
-      # Uses the `procyclingstats` Python library (github.com/themm1/procyclingstats)
-      # to scrape race data and write src/data/races-live.json.
-      # The Astro build reads this file in preference to the built-in seed data.
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Python dependencies
-        run: pip install procyclingstats
-
-      - name: Fetch recent races from ProCyclingStats
-        run: python3 scripts/fetch-races.py
-        # Non-fatal: if scraping fails (e.g. Cloudflare), the Astro build
-        # falls back to the seed data automatically.
-        continue-on-error: true
-
       # ── Node.js step: build the Astro site ───────────────────────────────
+      # Race data is loaded at build time directly from the Supabase
+      # stage_profiles table (scraped from PCS via browser session).
+      # No Python pre-step needed.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
