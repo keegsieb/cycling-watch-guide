@@ -91,6 +91,27 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
 <script>
   import { submitWatchPoint, submitRating, getWatchPoints, getRatings } from '../../../lib/supabase';
 
+  // ── localStorage helpers ────────────────────────────────────────────────
+  // Keys: "cww_vote_<stageUrl>"   → stored pctFromFinish (number as string)
+  //        "cww_rating_<stageUrl>" → stored rating value (number as string)
+
+  function getStoredVote(stageUrl: string): number | null {
+    const v = localStorage.getItem(`cww_vote_${stageUrl}`);
+    return v !== null ? parseFloat(v) : null;
+  }
+  function storeVote(stageUrl: string, pct: number) {
+    localStorage.setItem(`cww_vote_${stageUrl}`, String(pct));
+  }
+  function getStoredRating(stageUrl: string): number | null {
+    const v = localStorage.getItem(`cww_rating_${stageUrl}`);
+    return v !== null ? parseInt(v, 10) : null;
+  }
+  function storeRating(stageUrl: string, value: number) {
+    localStorage.setItem(`cww_rating_${stageUrl}`, String(value));
+  }
+
+  // ── Watch-point overlay ─────────────────────────────────────────────────
+
   async function initProfileOverlay(overlay: HTMLElement) {
     const stageUrl   = overlay.dataset.stageUrl!;
     const raceSlug   = overlay.dataset.raceSlug!;
@@ -103,6 +124,7 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
     const consensusLabel = overlay.querySelector<HTMLElement>('.consensus-label')!;
     const hint           = overlay.querySelector<HTMLElement>('.profile-overlay-hint')!;
 
+    // Show community consensus
     const { median, count } = await getWatchPoints(stageUrl);
     if (median !== null) {
       const leftPct = 100 - median;
@@ -136,12 +158,32 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       }
     }
 
+    // If already voted, restore the user's marker and lock the overlay
+    const previousVote = getStoredVote(stageUrl);
+    if (previousVote !== null) {
+      const xFraction = 1 - previousVote / 100;
+      marker.style.left = `${xFraction * 100}%`;
+      marker.style.display = 'block';
+      watchFill.style.left = `${xFraction * 100}%`;
+      watchFill.style.right = '0';
+      watchFill.style.display = 'block';
+      hint.textContent = '✓ Already voted';
+      hint.classList.add('hint-submitted');
+      overlay.style.cursor = 'default';
+      return; // no click handler attached — voting locked
+    }
+
     async function handleVote(e: MouseEvent | KeyboardEvent) {
       if (e instanceof KeyboardEvent && e.key !== 'Enter' && e.key !== ' ') return;
       const rect = overlay.getBoundingClientRect();
       const clientX = e instanceof MouseEvent ? e.clientX : rect.left + rect.width / 2;
       const xFraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       const pctFromFinish = Math.round((1 - xFraction) * 1000) / 10;
+
+      // Immediately lock the overlay so double-clicks can't sneak through
+      overlay.removeEventListener('click', handleVote);
+      overlay.removeEventListener('keydown', handleVote);
+      overlay.style.cursor = 'default';
 
       marker.style.left = `${xFraction * 100}%`;
       marker.style.display = 'block';
@@ -155,12 +197,20 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
       if (error) {
         hint.textContent = `Could not save: ${error}`;
         hint.classList.remove('hint-submitted');
+        // Re-attach handler so they can try again if it was a transient error
+        overlay.addEventListener('click', handleVote);
+        overlay.addEventListener('keydown', handleVote);
+        overlay.style.cursor = '';
+      } else {
+        storeVote(stageUrl, pctFromFinish); // persist so re-visits stay locked
       }
     }
 
     overlay.addEventListener('click', handleVote);
     overlay.addEventListener('keydown', handleVote);
   }
+
+  // ── Rating widget ───────────────────────────────────────────────────────
 
   async function initRatingWidget(section: HTMLElement) {
     const stageUrl   = section.dataset.stageUrl!;
@@ -173,14 +223,30 @@ const nextStage = stageIndex < totalStages - 1 ? `${base}race/${encodeURICompone
     averageEl.textContent = average !== null ? `${average}/10` : '–';
     if (count > 0) countEl.textContent = `(${count} rating${count !== 1 ? 's' : ''})`;
 
+    // If already rated, restore selected star and lock buttons
+    const previousRating = getStoredRating(stageUrl);
+    if (previousRating !== null) {
+      section.querySelectorAll<HTMLButtonElement>('.star-btn').forEach((btn) => {
+        btn.setAttribute('disabled', 'true');
+        if (parseInt(btn.dataset.value!, 10) === previousRating) btn.classList.add('selected');
+      });
+      feedbackEl.textContent = `You rated this ${previousRating}/10.`;
+      feedbackEl.style.display = 'block';
+      return;
+    }
+
     section.querySelectorAll<HTMLButtonElement>('.star-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const value = parseInt(btn.dataset.value!, 10);
+        // Lock immediately to prevent double-submit
         section.querySelectorAll('.star-btn').forEach((b) => b.setAttribute('disabled', 'true'));
         const { error } = await submitRating(raceSlug, stageUrl, value);
         if (error) {
           feedbackEl.textContent = `Could not save rating: ${error}`;
+          // Unlock on error so they can retry
+          section.querySelectorAll<HTMLButtonElement>('.star-btn').forEach((b) => b.removeAttribute('disabled'));
         } else {
+          storeRating(stageUrl, value);
           feedbackEl.textContent = `Thanks! You rated this ${value}/10.`;
           btn.classList.add('selected');
           const updated = await getRatings(stageUrl);

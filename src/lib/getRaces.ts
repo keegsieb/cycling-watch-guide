@@ -9,13 +9,10 @@
  *
  * When loaded from Supabase (case 1), all metadata and profile images are
  * already present — no further enrichment queries are needed.
- * cyclingoo.com is used as a fallback only for the ~46 stages where PCS
- * has not yet uploaded a profile image.
  */
 
 import type { Race, Stage } from './procyclingstats';
 import { SEED_RACES } from '../data/seedRaces';
-import { enrichRacesWithCyclingoo } from './cyclingoo';
 import { getStageProfilesByYear, type StageProfile } from './supabase';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -125,14 +122,6 @@ export async function getAllRaces(): Promise<{ races: Race[]; source: string }> 
     } catch (err) {
       console.error('[getRaces] supabase enrichment failed:', err);
     }
-  }
-
-  // Cyclingoo fallback for stages still missing a profile image (~46 races
-  // where PCS hasn't uploaded a profile yet)
-  try {
-    races = await enrichRacesWithCyclingoo(races);
-  } catch (err) {
-    console.error('[getRaces] cyclingoo enrichment failed:', err);
   }
 
   // Filter to races/stages that have already started

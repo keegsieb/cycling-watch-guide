@@ -8,8 +8,7 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "astro": "^5.18.1",
     "@supabase/supabase-js": "^2.49.1",
-    "cheerio": "^1.0.0"
+    "astro": "^5.18.1"
   }
 }
