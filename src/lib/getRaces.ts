@@ -72,5 +72,14 @@ export async function getAllRaces(): Promise<{ races: Race[]; source: string }> 
     console.error('[getRaces] cyclingoo enrichment failed:', err);
   }
 
+  // Only show races that have already started (filter out fully future races).
+  // Ongoing stage races (started but not yet finished) are included.
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  races = races.filter((r) => {
+    const start = r.startDate ? new Date(r.startDate + 'T00:00:00Z') : null;
+    return start !== null && start <= today;
+  });
+
   return { races, source };
 }

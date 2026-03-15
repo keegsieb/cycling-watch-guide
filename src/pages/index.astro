@@ -1,10 +1,47 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import RaceCard from '../components/RaceCard.astro';
+import StageCard from '../components/StageCard.astro';
 import { getAllRaces } from '../lib/getRaces';
 
 const { races, source } = await getAllRaces();
 const usingFallback = source === 'seed';
+
+// Flatten all stages from all races, keep race info attached
+interface StageEntry {
+  stage: import('../lib/procyclingstats').Stage;
+  raceName: string;
+  raceSlug: string;
+  stageIndex: number;
+  isWomen: boolean;
+}
+
+const WOMEN_KEYWORDS = ['donne', 'femmes', 'femina', 'women', 'féminin'];
+
+function isWomensRace(name: string, slug: string): boolean {
+  const n = (name + ' ' + slug).toLowerCase();
+  return WOMEN_KEYWORDS.some((w) => n.includes(w));
+}
+
+const stageEntries: StageEntry[] = [];
+for (const race of races) {
+  const women = isWomensRace(race.name, race.slug);
+  race.stages.forEach((stage, i) => {
+    stageEntries.push({
+      stage,
+      raceName: race.name,
+      raceSlug: race.slug,
+      stageIndex: i,
+      isWomen: women,
+    });
+  });
+}
+
+// Sort most recent first
+stageEntries.sort((a, b) => {
+  const da = a.stage.date || '';
+  const db = b.stage.date || '';
+  return da < db ? 1 : da > db ? -1 : 0;
+});
 
 const builtAt = new Date().toLocaleDateString('en-GB', {
   weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -12,44 +49,60 @@ const builtAt = new Date().toLocaleDateString('en-GB', {
 });
 ---
 
-<Layout title="Recent Races">
+<Layout title="Cycling Worth Watching">
   <div class="page-header">
-    <h1>Races from the last 7 days</h1>
+    <h1>Cycling Worth Watching</h1>
     <p class="intro">
-      Click a race to see the route profile and find out — spoiler-free —
-      how many kilometres are worth watching, according to the community.
+      Find out where races get exciting — spoiler-free. The community marks
+      where to start watching and rates each stage.
     </p>
-    <p class="built-at">Last updated: {builtAt}</p>
+    <p class="built-at">Updated: {builtAt}</p>
   </div>
 
   {usingFallback && (
     <div class="notice-banner">
-      <p>
-        Live race data could not be fetched at build time (ProCyclingStats uses bot
-        protection). Showing a curated list of current-season races. In production
-        the site rebuilds daily via GitHub Actions, which may succeed where local
-        builds don't.
-      </p>
+      Showing curated seed races — live data fetches daily via GitHub Actions.
     </div>
   )}
 
-  {!usingFallback && races.length === 0 && (
+  {stageEntries.length === 0 && (
     <div class="empty-state">
-      <p>No races found in the last 7 days.</p>
-      <p>
-        Check the full calendar on
-        <a href="https://www.procyclingstats.com/races.php" target="_blank" rel="noopener">ProCyclingStats</a>.
-      </p>
+      <p>No recent stages found. Check back soon!</p>
     </div>
   )}
 
-  {races.length > 0 && (
-    <ul class="race-list">
-      {races.map((race) => (
-        <li>
-          <RaceCard race={race} />
-        </li>
+  {stageEntries.length > 0 && (
+    <div class="stage-grid">
+      {stageEntries.map((e) => (
+        <StageCard
+          stage={e.stage}
+          raceName={e.raceName}
+          raceSlug={e.raceSlug}
+          stageIndex={e.stageIndex}
+          isWomen={e.isWomen}
+        />
       ))}
-    </ul>
+    </div>
   )}
 </Layout>
+
+<script>
+  import { getWatchPoints } from '../lib/supabase';
+
+  // Load community vote counts for all stage cards
+  async function loadVoteCounts() {
+    const cards = document.querySelectorAll<HTMLElement>('.stage-card-votes[data-stage-url]');
+    await Promise.all(Array.from(cards).map(async (el) => {
+      const stageUrl = el.dataset.stageUrl!;
+      const { median, count } = await getWatchPoints(stageUrl);
+      const text = el.querySelector('.votes-text')!;
+      if (median !== null) {
+        text.textContent = `${count} vote${count !== 1 ? 's' : ''} · watch last ${median.toFixed(0)}%`;
+      } else {
+        text.textContent = 'No votes yet';
+      }
+    }));
+  }
+
+  loadVoteCounts();
+</script>

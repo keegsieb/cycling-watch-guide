@@ -4,24 +4,35 @@ import type { Stage } from '../lib/procyclingstats';
 interface Props {
   stage: Stage;
   raceSlug: string;
+  stageIndex: number;
 }
-const { stage, raceSlug } = Astro.props;
+
+const { stage, raceSlug, stageIndex } = Astro.props;
+
+function formatDate(d: string) {
+  if (!d) return '';
+  return new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+}
 ---
 
-<section class="stage-section" data-stage-url={stage.url} data-race-slug={raceSlug}>
+<section
+  class="stage-section"
+  id={`stage-${stageIndex}`}
+  data-stage-url={stage.url}
+  data-race-slug={raceSlug}
+  data-distance-km={stage.distanceKm ?? ''}
+>
   <div class="stage-header">
-    <h2 class="stage-label">{stage.label}</h2>
-    <div class="stage-meta">
-      {stage.date && (
-        <span class="stage-date">
-          {new Date(stage.date + 'T12:00:00Z').toLocaleDateString('en-GB', {
-            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-          })}
-        </span>
-      )}
-      {stage.distanceKm && (
-        <span class="stage-distance">{stage.distanceKm} km</span>
-      )}
+    <div class="stage-header-left">
+      <h2 class="stage-label">{stage.label}</h2>
+      <div class="stage-meta">
+        {stage.date && <span class="stage-date">{formatDate(stage.date)}</span>}
+        {stage.distanceKm && (
+          <span class="stage-distance">{stage.distanceKm} km</span>
+        )}
+      </div>
     </div>
   </div>
 
@@ -34,8 +45,9 @@ const { stage, raceSlug } = Astro.props;
           alt={`Route profile for ${stage.label}`}
           class="profile-image"
           loading="lazy"
+          crossorigin="anonymous"
+          data-autocrop="true"
         />
-        <!-- Clickable overlay for "worth watching from here" vote -->
         <div
           class="profile-overlay"
           role="button"
@@ -45,12 +57,11 @@ const { stage, raceSlug } = Astro.props;
           data-race-slug={raceSlug}
           data-distance-km={stage.distanceKm ?? ''}
         >
-          <div class="profile-overlay-hint">
-            👆 Click to mark where it gets exciting
-          </div>
-          <!-- Marker is injected by client-side JS -->
+          <div class="profile-overlay-hint">Click to mark where it gets exciting</div>
+          <!-- Colored fill: shows the "worth watching" zone after voting -->
+          <div class="watch-fill" style="display:none;"></div>
           <div class="vote-marker" style="display:none;"></div>
-          <!-- Community consensus line is injected by client-side JS -->
+          <div class="consensus-fill" style="display:none;"></div>
           <div class="consensus-line" style="display:none;"></div>
           <div class="consensus-label" style="display:none;"></div>
         </div>
@@ -63,32 +74,27 @@ const { stage, raceSlug } = Astro.props;
         data-distance-km={stage.distanceKm ?? ''}
       >
         <p>
-          Loading profile image…
-          <noscript>
-            Profile image not available without JavaScript.
-            <a href={stage.url} target="_blank" rel="noopener">View on ProCyclingStats</a>.
-          </noscript>
+          Profile image not available.
+          <a href={stage.url} target="_blank" rel="noopener">View on ProCyclingStats ↗</a>
         </p>
       </div>
     )}
   </div>
 
-  <!-- Voting stats (populated by client JS) -->
+  <!-- Community vote stats (populated by client JS) -->
   <div class="vote-stats" data-stage-url={stage.url}>
     <div class="vote-stats-loading">Loading community data…</div>
   </div>
 
   <!-- Rating widget -->
   <div class="rating-section" data-stage-url={stage.url} data-race-slug={raceSlug}>
-    <h3>Rate this stage</h3>
-    <div class="star-rating" role="group" aria-label="Rate this stage from 1 to 10">
-      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-        <button class="star-btn" data-value={n} aria-label={`${n} out of 10`}>
-          {n}
-        </button>
-      ))}
-    </div>
-    <div class="rating-stats">
+    <div class="rating-row">
+      <span class="rating-label">Rate this stage:</span>
+      <div class="star-rating" role="group" aria-label="Rate this stage from 1 to 10">
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <button class="star-btn" data-value={n} aria-label={`${n} out of 10`}>{n}</button>
+        ))}
+      </div>
       <span class="rating-average">–</span>
       <span class="rating-count"></span>
     </div>

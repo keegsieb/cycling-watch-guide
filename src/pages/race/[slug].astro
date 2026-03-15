@@ -17,8 +17,7 @@ const { race: raceBase } = Astro.props as { race: Race };
 // Stages and profile images are already enriched by getAllRaces() via cyclingoo.
 let race: Race = raceBase;
 
-// If no stages were loaded (PCS blocked), build a placeholder entry
-// so the race page still has something to render.
+// If no stages were loaded, build a placeholder entry so the page still renders.
 if (race.stages.length === 0) {
   race = {
     ...race,
@@ -49,7 +48,7 @@ const base = import.meta.env.BASE_URL;
   description={`Community watch guide for ${race.name}. How many km are worth watching?`}
 >
   <nav class="breadcrumb">
-    <a href={`${base}`}>← All races</a>
+    <a href={`${base}`}>← All stages</a>
   </nav>
 
   <div class="race-page-header">
@@ -68,82 +67,107 @@ const base = import.meta.env.BASE_URL;
   </div>
 
   <div class="how-to-use">
-    <h2>How to use this page</h2>
-    <ol>
-      <li>
-        <strong>Click on the route profile</strong> at the point where you think the race
-        starts getting exciting. The further left you click, the more of the race you're
-        recommending people watch.
-      </li>
-      <li><strong>Rate the stage</strong> from 1 to 10 after you've watched it.</li>
-      <li>
-        The <strong>community consensus marker</strong> shows the median of all votes —
-        that's your spoiler-free start point.
-      </li>
-    </ol>
+    <span class="how-to-icon">👆</span>
+    <span>
+      <strong>Click the profile</strong> to mark where the race gets exciting.
+      <strong>Rate below</strong> after watching. Green line = community start point.
+    </span>
   </div>
 
   <div class="stages-list">
-    {race.stages.map((stage) => (
-      <RaceProfile stage={stage} raceSlug={race.slug} />
+    {race.stages.map((stage, i) => (
+      <RaceProfile stage={stage} raceSlug={race.slug} stageIndex={i} />
     ))}
   </div>
 </Layout>
 
-<!-- Client-side: profile image loading, voting, and community data -->
+<!-- Client-side: auto-crop, voting, community data, ratings -->
 <script>
   import { submitWatchPoint, submitRating, getWatchPoints, getRatings } from '../../lib/supabase';
-  import { buildProfileImageCandidates, parseStageUrl } from '../../lib/profileUrls';
 
-  // ─── Profile images ───────────────────────────────────────────────────────
-  // PCS serves profile images as static files. When the server-side fetch is
-  // blocked by Cloudflare, the browser can often load them directly because
-  // the user's browser already has valid PCS cookies from real visits.
+  // ─── Auto-crop profile images ─────────────────────────────────────────────
+  // Try canvas pixel analysis to remove white margins from profile images.
+  // Falls back to CSS if CORS is blocked.
 
-  function tryLoadProfileImages() {
-    document.querySelectorAll<HTMLElement>('.profile-missing').forEach((placeholder) => {
-      const section = placeholder.closest<HTMLElement>('.stage-section');
-      if (!section) return;
-      const stageUrl = section.dataset.stageUrl;
-      const raceSlug = section.dataset.raceSlug;
-      if (!stageUrl) return;
+  async function autocropImage(img: HTMLImageElement): Promise<void> {
+    try {
+      // Reload with crossOrigin to allow getImageData
+      const crossImg = new Image();
+      crossImg.crossOrigin = 'anonymous';
+      await new Promise<void>((res, rej) => {
+        crossImg.onload = () => res();
+        crossImg.onerror = rej;
+        // Add a dummy param to bypass CORS cache (some CDNs require this)
+        crossImg.src = img.src.includes('?') ? img.src : img.src + '?cors=1';
+      });
 
-      const parsed = parseStageUrl(stageUrl);
-      if (!parsed) return;
+      const W = crossImg.naturalWidth;
+      const H = crossImg.naturalHeight;
+      if (W === 0 || H === 0) return;
 
-      const candidates = buildProfileImageCandidates(parsed.slug, parsed.year, parsed.stageNumber);
-      let tried = 0;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(crossImg, 0, 0);
 
-      function tryNext() {
-        if (tried >= candidates.length) return;
-        const url = candidates[tried++];
-        const img = new Image();
-        img.onload = () => {
-          const container = placeholder.closest('.profile-container');
-          if (!container) return;
-          const distKm = section.dataset.distanceKm ?? '';
-          container.innerHTML = `
-            <div class="profile-wrapper">
-              <img src="${url}" alt="Route profile" class="profile-image" />
-              <div class="profile-overlay"
-                   role="button" tabindex="0"
-                   aria-label="Click to mark where the race becomes worth watching"
-                   data-stage-url="${stageUrl}"
-                   data-race-slug="${raceSlug ?? ''}"
-                   data-distance-km="${distKm}">
-                <div class="profile-overlay-hint">👆 Click to mark where it gets exciting</div>
-                <div class="vote-marker" style="display:none;"></div>
-                <div class="consensus-line" style="display:none;"></div>
-                <div class="consensus-label" style="display:none;"></div>
-              </div>
-            </div>`;
-          const overlay = container.querySelector<HTMLElement>('.profile-overlay');
-          if (overlay) initProfileOverlay(overlay);
-        };
-        img.onerror = tryNext;
-        img.src = url;
+      // getImageData throws SecurityError if CORS is blocked
+      const { data } = ctx.getImageData(0, 0, W, H);
+
+      let top = H, bottom = 0, left = W, right = 0;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = (y * W + x) * 4;
+          // Non-white/near-white pixel (alpha > 0 and not near white)
+          if (data[i + 3] > 10 && (data[i] < 242 || data[i + 1] < 242 || data[i + 2] < 242)) {
+            if (y < top) top = y;
+            if (y > bottom) bottom = y;
+            if (x < left) left = x;
+            if (x > right) right = x;
+          }
+        }
       }
-      tryNext();
+
+      if (bottom <= top || right <= left) return; // all white, skip
+
+      const padY = Math.max(4, Math.floor(H * 0.01));
+      const padX = Math.max(4, Math.floor(W * 0.005));
+      top    = Math.max(0, top - padY);
+      bottom = Math.min(H, bottom + padY);
+      left   = Math.max(0, left - padX);
+      right  = Math.min(W, right + padX);
+
+      const cropW = right - left;
+      const cropH = bottom - top;
+
+      // Apply crop by adjusting the img inside its wrapper via CSS
+      const wrapper = img.parentElement as HTMLElement;
+      const aspectPct = (cropH / cropW) * 100;
+      wrapper.style.paddingBottom = `${aspectPct}%`;
+      wrapper.style.position = 'relative';
+      wrapper.style.height = '0';
+      wrapper.style.overflow = 'hidden';
+
+      img.style.position = 'absolute';
+      img.style.width  = `${(W / cropW) * 100}%`;
+      img.style.height = 'auto';
+      img.style.top    = `${-(top / H) * 100 * (H / cropH)}%`;
+      img.style.left   = `${-(left / W) * 100 * (W / cropW)}%`;
+      img.style.maxWidth = 'none';
+
+    } catch {
+      // CORS blocked — apply CSS-based crop (show approximate content area)
+      img.classList.add('profile-css-crop');
+    }
+  }
+
+  function initAutocrop() {
+    document.querySelectorAll<HTMLImageElement>('img[data-autocrop="true"]').forEach((img) => {
+      if (img.complete && img.naturalWidth > 0) {
+        autocropImage(img);
+      } else {
+        img.addEventListener('load', () => autocropImage(img), { once: true });
+      }
     });
   }
 
@@ -153,37 +177,46 @@ const base = import.meta.env.BASE_URL;
     const stageUrl = overlay.dataset.stageUrl!;
     const raceSlug = overlay.dataset.raceSlug!;
     const distanceKm = overlay.dataset.distanceKm ? parseFloat(overlay.dataset.distanceKm) : null;
-    const marker = overlay.querySelector<HTMLElement>('.vote-marker')!;
+
+    const marker        = overlay.querySelector<HTMLElement>('.vote-marker')!;
+    const watchFill     = overlay.querySelector<HTMLElement>('.watch-fill')!;
+    const consensusFill = overlay.querySelector<HTMLElement>('.consensus-fill')!;
     const consensusLine = overlay.querySelector<HTMLElement>('.consensus-line')!;
     const consensusLabel = overlay.querySelector<HTMLElement>('.consensus-label')!;
-    const hint = overlay.querySelector<HTMLElement>('.profile-overlay-hint')!;
+    const hint          = overlay.querySelector<HTMLElement>('.profile-overlay-hint')!;
 
+    // Load existing community data
     const { median, count } = await getWatchPoints(stageUrl);
     if (median !== null) {
-      // PCS profiles: finish is on the right → leftPct = 100 - median
-      consensusLine.style.left = `${100 - median}%`;
+      const leftPct = 100 - median; // finish is on the right
+      consensusFill.style.left = `${leftPct}%`;
+      consensusFill.style.right = '0';
+      consensusFill.style.display = 'block';
+      consensusLine.style.left = `${leftPct}%`;
       consensusLine.style.display = 'block';
       const label = distanceKm
-        ? `Community: watch from ${Math.round((median / 100) * distanceKm)} km to go (${count} vote${count !== 1 ? 's' : ''})`
-        : `Community: ${median.toFixed(0)}% from finish (${count} vote${count !== 1 ? 's' : ''})`;
+        ? `Watch from ${Math.round((median / 100) * distanceKm)} km to go · ${count} vote${count !== 1 ? 's' : ''}`
+        : `Last ${median.toFixed(0)}% · ${count} vote${count !== 1 ? 's' : ''}`;
       consensusLabel.textContent = label;
       consensusLabel.style.display = 'block';
     }
 
-    // Update the vote-stats block below the profile
-    const statsEl = document.querySelector<HTMLElement>(`.vote-stats[data-stage-url="${CSS.escape(stageUrl)}"]`);
+    // Update vote-stats block
+    const statsEl = document.querySelector<HTMLElement>(
+      `.vote-stats[data-stage-url="${CSS.escape(stageUrl)}"]`
+    );
     if (statsEl) {
       if (median !== null) {
         const kmText = distanceKm
           ? `${Math.round((median / 100) * distanceKm)} km from the finish`
           : `${median.toFixed(0)}% from the finish`;
         statsEl.innerHTML = `
-          <p class="vote-summary">
-            <strong>${count} ${count === 1 ? 'person has' : 'people have'} voted.</strong>
+          <div class="vote-summary">
+            <span class="vote-count-badge">${count} vote${count !== 1 ? 's' : ''}</span>
             Community says: start watching from <strong>${kmText}</strong>.
-          </p>`;
+          </div>`;
       } else {
-        statsEl.innerHTML = `<p class="vote-summary no-votes">No votes yet — be the first!</p>`;
+        statsEl.innerHTML = `<div class="vote-summary no-votes">No votes yet — be the first to click the profile above!</div>`;
       }
     }
 
@@ -194,12 +227,23 @@ const base = import.meta.env.BASE_URL;
       const xFraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       const pctFromFinish = Math.round((1 - xFraction) * 1000) / 10;
 
+      // Show marker line
       marker.style.left = `${xFraction * 100}%`;
       marker.style.display = 'block';
-      hint.textContent = '✓ Vote submitted!';
+
+      // Fill the "worth watching" zone from click point to right edge
+      watchFill.style.left = `${xFraction * 100}%`;
+      watchFill.style.right = '0';
+      watchFill.style.display = 'block';
+
+      hint.textContent = '✓ Voted!';
+      hint.classList.add('hint-submitted');
 
       const { error } = await submitWatchPoint(raceSlug, stageUrl, pctFromFinish);
-      if (error) hint.textContent = `Could not save vote: ${error}`;
+      if (error) {
+        hint.textContent = `Could not save: ${error}`;
+        hint.classList.remove('hint-submitted');
+      }
     }
 
     overlay.addEventListener('click', handleVote);
@@ -211,12 +255,12 @@ const base = import.meta.env.BASE_URL;
   async function initRatingWidget(section: HTMLElement) {
     const stageUrl = section.dataset.stageUrl!;
     const raceSlug = section.dataset.raceSlug!;
-    const averageEl = section.querySelector<HTMLElement>('.rating-average')!;
-    const countEl = section.querySelector<HTMLElement>('.rating-count')!;
+    const averageEl  = section.querySelector<HTMLElement>('.rating-average')!;
+    const countEl    = section.querySelector<HTMLElement>('.rating-count')!;
     const feedbackEl = section.querySelector<HTMLElement>('.rating-feedback')!;
 
     const { average, count } = await getRatings(stageUrl);
-    averageEl.textContent = average !== null ? `${average}/10` : 'No ratings yet';
+    averageEl.textContent = average !== null ? `${average}/10` : '–';
     if (count > 0) countEl.textContent = `(${count} rating${count !== 1 ? 's' : ''})`;
 
     section.querySelectorAll<HTMLButtonElement>('.star-btn').forEach((btn) => {
@@ -240,9 +284,19 @@ const base = import.meta.env.BASE_URL;
     });
   }
 
+  // ─── Scroll to hashed stage ───────────────────────────────────────────────
+  function scrollToHash() {
+    if (!window.location.hash) return;
+    const target = document.querySelector(window.location.hash);
+    if (target) {
+      setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    }
+  }
+
   // ─── Boot ─────────────────────────────────────────────────────────────────
 
-  tryLoadProfileImages();
+  initAutocrop();
   document.querySelectorAll<HTMLElement>('.profile-overlay').forEach(initProfileOverlay);
   document.querySelectorAll<HTMLElement>('.rating-section').forEach(initRatingWidget);
+  scrollToHash();
 </script>

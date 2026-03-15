@@ -30,6 +30,7 @@ OUTPUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'src', 'data', 'race
 # Major UCI WorldTour races by month (fallback list of known race slugs)
 # These are checked even if the calendar scrape fails.
 KNOWN_RACE_SLUGS_2026 = [
+    # ── Men ──────────────────────────────────────────────────────────────────
     ('omloop-het-nieuwsblad-elite', '2026'),
     ('kuurne-brussels-kuurne', '2026'),
     ('strade-bianche', '2026'),
@@ -45,6 +46,19 @@ KNOWN_RACE_SLUGS_2026 = [
     ('amstel-gold-race', '2026'),
     ('la-fleche-wallonne', '2026'),
     ('liege-bastogne-liege', '2026'),
+    ('tour-de-romandie', '2026'),
+    ('criterium-du-dauphine', '2026'),
+    # ── Women ─────────────────────────────────────────────────────────────────
+    ('strade-bianche-donne', '2026'),
+    ('omloop-het-nieuwsblad-women-elite', '2026'),
+    ('gent-wevelgem-women', '2026'),
+    ('ronde-van-vlaanderen-women', '2026'),
+    ('paris-roubaix-femmes', '2026'),
+    ('la-fleche-wallonne-femmes', '2026'),
+    ('liege-bastogne-liege-femmes', '2026'),
+    ('milano-sanremo-donne', '2026'),
+    ('la-vuelta-femenina', '2026'),
+    ('giro-donne', '2026'),
 ]
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -1,18 +1,17 @@
 /**
  * Seed data: a list of major UCI races from the 2026 spring calendar.
  *
- * This is used as a fallback when the ProCyclingStats build-time fetch
- * is blocked (e.g. locally). In production, the Supabase database is
- * the primary source; PCS scraping supplements it.
+ * Used as fallback when the Python/PCS build-time fetch fails (e.g. locally).
+ * Includes both men's and women's races.
  *
- * To add a race: copy one of the entries below, update the fields,
- * and submit a PR. Alternatively, admins can add races directly via
- * the Supabase dashboard.
+ * PCS slug convention: procyclingstats.com/race/{slug}/{year}
+ * Cyclingoo will be used to fill in profileImageUrl at build time.
  */
 
 import type { Race } from '../lib/procyclingstats';
 
 export const SEED_RACES: Race[] = [
+  // ── Men ──────────────────────────────────────────────────────────────────
   {
     name: 'Strade Bianche',
     slug: 'strade-bianche-2026',
@@ -67,6 +66,46 @@ export const SEED_RACES: Race[] = [
         url: 'https://www.procyclingstats.com/race/milano-sanremo/2026',
         profileImageUrl: null,
         distanceKm: 294,
+        date: '2026-03-21',
+      },
+    ],
+  },
+
+  // ── Women ─────────────────────────────────────────────────────────────────
+  {
+    name: 'Strade Bianche Donne',
+    slug: 'strade-bianche-donne-2026',
+    url: 'https://www.procyclingstats.com/race/strade-bianche-donne/2026',
+    startDate: '2026-03-07',
+    endDate: '2026-03-07',
+    category: '1.UWT',
+    country: 'it',
+    stages: [
+      {
+        name: 'Strade Bianche Donne',
+        label: 'Strade Bianche Donne 2026',
+        url: 'https://www.procyclingstats.com/race/strade-bianche-donne/2026',
+        profileImageUrl: null,
+        distanceKm: 136,
+        date: '2026-03-07',
+      },
+    ],
+  },
+  {
+    name: 'Milan-San Remo Donne',
+    slug: 'milan-san-remo-donne-2026',
+    url: 'https://www.procyclingstats.com/race/milano-sanremo-donne/2026',
+    startDate: '2026-03-21',
+    endDate: '2026-03-21',
+    category: '1.UWT',
+    country: 'it',
+    stages: [
+      {
+        name: 'Milan-San Remo Donne',
+        label: 'Milan-San Remo Donne 2026',
+        url: 'https://www.procyclingstats.com/race/milano-sanremo-donne/2026',
+        profileImageUrl: null,
+        distanceKm: 148,
         date: '2026-03-21',
       },
     ],
